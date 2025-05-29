@@ -1,0 +1,13 @@
+# MATLAB cache and backup files
+*.asv
+*.m~
+*.fig~
+*.bak
+*~
+
+# Temporary files
+*.log
+*.tmp
+*.out
+
+# User-specific
