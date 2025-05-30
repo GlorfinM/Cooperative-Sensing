@@ -86,7 +86,7 @@ freq_sub = fc + (0:Nc) * fdelta / Nc;
 % alpha = sqrt(lambda^2 * rcs / ((4*pi)^3 * range_tx^4));
 
 % 生成信道矩阵
-% H_channel = generate_channel_matrix();
+H_channel = generate_ISAC_Hecho_channel(Nt, Nc, fc, lambda, d, Ts, target_pos, target_vel, rcs, fdelta);
 
 %% ================== YOLO==================
 
@@ -98,36 +98,6 @@ freq_sub = fc + (0:Nc) * fdelta / Nc;
 % vel_error = norm(vel_est - target_vel);
 
 %% ================== 函数定义 ==================
-
-function H_channel = generate_channel_matrix(Nt, Nr, M, Ns, freq_sub, alpha, ...
-                                           range_tx, angle_tx, vr_tx, ...
-                                           angle_rx, ...
-                                           d, f0, Ts, c)
-    % 生成信道矩阵
-    H_channel = cell(M + 1, Ns);
-    
-    for m = 0:M
-        fm = freq_sub(m + 1);
-        for ns = 1:Ns
-            % 多普勒相位
-            doppler_phase = 4 * pi * f0 * vr_tx * (ns - 1) * Ts / c;
-            % 距离相位  
-            range_phase = -4 * pi * fm * range_tx / c;
-            
-            % 导向矢量
-            a_tx = exp(1j * 2 * pi * fm * (0:Nt-1)' * d * sin(angle_tx) / c) / sqrt(Nt);
-            a_rx1 = exp(1j * 2 * pi * fm * (0:Nr-1)' * d * sin(angle_rx) / c) / sqrt(Nr);
-            a_rx2 = exp(1j * 2 * pi * fm * (0:Nr-1)' * d * sin(angle_rx2) / c) / sqrt(Nr);
-            
-            % 信道矩阵
-            phase_factor = alpha * exp(1j * (doppler_phase + range_phase));
-            H1 = phase_factor * a_rx1 * a_tx.';
-            H2 = phase_factor * a_rx2 * a_tx.';
-            
-            H_channel{m + 1, ns} = {H1, H2};
-        end
-    end
-end
 
 function [y_rx1, y_rx2] = generate_received_signals(s_symbols, H_channel, w_rx, ...
                                                    v_tx, M, Ns, noise_power)
