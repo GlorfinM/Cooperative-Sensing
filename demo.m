@@ -10,15 +10,14 @@ lambda = c0 / fc;       % 波长
 
 % 天线阵列参数
 Nt = 16;                % 发射天线数
-Nr = 16;                % 接收天线数
 d = lambda / 2;         % 天线间距
 
-N = 16;              % 天线数
+
 Omega0 = -0.5;       % 波束起始角度
 B = 1;             % 波束宽度
 Q = 512;             % 角度量化数
 M = 1000;              % 最大迭代次数
-v = AMCF_ZCI(N, Omega0, B, Q, M);
+v = AMCF_ZCI(Nt, Omega0, B, Q, M);
 
 
 % % 可视化波束图
