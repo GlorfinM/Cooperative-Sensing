@@ -46,74 +46,74 @@ for q_idx = 1:Q % 遍历每个 AoA 量化点
     end
 end
 
-% % Step 3: Iterative optimization (AMCF)
-% for m = 1:M
-%     r = g .* exp(1j * angle(A' * v));
-%     p = A * r;
-% 
-%     % Closed-form solution for constant modulus vector v
-%     for n = 1:N
-%         v(n) = p(n) / abs(p(n));
-%     end
-% end
-
-% Step 3: 迭代优化 (AMCF - Alternating Minimization Constant modulus Codeword Framework)
-% 此处 v 是步骤1中得到的 v(0)
-% 循环迭代 M 次
+% Step 3: Iterative optimization (AMCF)
 for m = 1:M
-    % 对应算法1的第5行: 计算 Theta_m = angle(A^H * v(m-1))
-    % A 是 N x Q 矩阵, v 是 N x 1 向量. A' 是 Q x N 矩阵. A'*v 是 Q x 1 向量.
-    Theta_m = angle(A' * v); % Theta_m 是 Q x 1 的相位向量
+    r = g .* exp(1j * angle(A' * v));
+    p = A * r;
 
-    % 对应算法1的第6行: 计算 r_m = g .* exp(1j * Theta_m)
-    % g 是 Q x 1 向量. '.*' 表示元素级乘法.
-    r_m = g .* exp(1j * Theta_m); % r_m 是 Q x 1 向量
-
-    % 隐式步骤: 计算 p_m = A * r_m
-    % 这个 p_m 用于构造公式 (26) 中的 t 向量分量
-    % A 是 N x Q 矩阵, r_m 是 Q x 1 向量. p_m 是 N x 1 复数向量.
-    p_m = A * r_m;
-
-    % 对应算法1的第7行: 通过公式 (27) 和 (26) 计算 v(m)
-    % 初始化 v_next, 它将成为当前的 v(m)
-    v_next = zeros(N, 1); % N x 1 的零向量
-
-    % 遍历每个天线单元 n (对应论文中的 n_idx 从 1 到 N_UE)
-    for n_idx = 1:N
-        % 获取 p_m(n_idx) 的实部和虚部
-        % 根据定义 t = [Re{p}; Im{p}],
-        % 对于 v 的第 n 个元素, [t]_n 是 Re{p_m(n_idx)}, [t]_{n+N_UE} 是 Im{p_m(n_idx)}
-        t_n_val = real(p_m(n_idx));        % p_m(n_idx) 的实部
-        t_n_plus_N_val = imag(p_m(n_idx)); % p_m(n_idx) 的虚部
-
-        % 计算公式 (26) 中的各项
-        % 分母项: sqrt(N_UE * ([t]_n^2 + [t]_{n+N_UE}^2))
-        % 此处 N_UE 即为 N
-        denominator_squared_term = N * (t_n_val^2 + t_n_plus_N_val^2);
-
-        u_n_val = 0;        % 如果 p_m(n_idx) 为零, 则 u_n_val 默认为 0
-        u_n_plus_N_val = 0; % 如果 p_m(n_idx) 为零, 则 u_n_plus_N_val 默认为 0
-
-        % 检查 p_m(n_idx) 是否非零, 以避免除以零的错误
-        % 使用一个小的 epsilon 进行浮点数比较
-        if denominator_squared_term > 1e-12 % 判断分母项是否显著大于零的阈值
-            denominator_val = sqrt(denominator_squared_term); % 计算分母
-            % 根据公式 (26) 计算 u_n 和 u_{n+N_UE}
-            u_n_val = t_n_val / denominator_val;
-            u_n_plus_N_val = t_n_plus_N_val / denominator_val;
-        end
-        % 如果 denominator_squared_term 为零 (或数值上接近零),
-        % 则 t_n_val 和 t_n_plus_N_val 也为零, 因此 u_n_val 和 u_n_plus_N_val 保持为 0.
-
-        % 根据公式 (27): [v(m)]_n = [u]_n + j * [u]_{n+N_UE}
-        % 构造 v(m) 的第 n_idx 个元素
-        v_next(n_idx) = u_n_val + 1j * u_n_plus_N_val;
+    % Closed-form solution for constant modulus vector v
+    for n = 1:N
+        v(n) = p(n) / abs(p(n));
     end
+end
 
-    % 更新 v 为当前迭代计算得到的 v_next, 用于下一次迭代
-    v = v_next;
-end
-% 输出: v 是经过 M 次迭代后的最终码字 v(M)
-% 如果 p_m(n_idx) 非零, v 的每个元素的模长将是 1/sqrt(N);
-% 如果 p_m(n_idx) 为零, 则 v 的对应元素为 0.
-end
+% % Step 3: 迭代优化 (AMCF - Alternating Minimization Constant modulus Codeword Framework)
+% % 此处 v 是步骤1中得到的 v(0)
+% % 循环迭代 M 次
+% for m = 1:M
+%     % 对应算法1的第5行: 计算 Theta_m = angle(A^H * v(m-1))
+%     % A 是 N x Q 矩阵, v 是 N x 1 向量. A' 是 Q x N 矩阵. A'*v 是 Q x 1 向量.
+%     Theta_m = angle(A' * v); % Theta_m 是 Q x 1 的相位向量
+% 
+%     % 对应算法1的第6行: 计算 r_m = g .* exp(1j * Theta_m)
+%     % g 是 Q x 1 向量. '.*' 表示元素级乘法.
+%     r_m = g .* exp(1j * Theta_m); % r_m 是 Q x 1 向量
+% 
+%     % 隐式步骤: 计算 p_m = A * r_m
+%     % 这个 p_m 用于构造公式 (26) 中的 t 向量分量
+%     % A 是 N x Q 矩阵, r_m 是 Q x 1 向量. p_m 是 N x 1 复数向量.
+%     p_m = A * r_m;
+% 
+%     % 对应算法1的第7行: 通过公式 (27) 和 (26) 计算 v(m)
+%     % 初始化 v_next, 它将成为当前的 v(m)
+%     v_next = zeros(N, 1); % N x 1 的零向量
+% 
+%     % 遍历每个天线单元 n (对应论文中的 n_idx 从 1 到 N_UE)
+%     for n_idx = 1:N
+%         % 获取 p_m(n_idx) 的实部和虚部
+%         % 根据定义 t = [Re{p}; Im{p}],
+%         % 对于 v 的第 n 个元素, [t]_n 是 Re{p_m(n_idx)}, [t]_{n+N_UE} 是 Im{p_m(n_idx)}
+%         t_n_val = real(p_m(n_idx));        % p_m(n_idx) 的实部
+%         t_n_plus_N_val = imag(p_m(n_idx)); % p_m(n_idx) 的虚部
+% 
+%         % 计算公式 (26) 中的各项
+%         % 分母项: sqrt(N_UE * ([t]_n^2 + [t]_{n+N_UE}^2))
+%         % 此处 N_UE 即为 N
+%         denominator_squared_term = N * (t_n_val^2 + t_n_plus_N_val^2);
+% 
+%         u_n_val = 0;        % 如果 p_m(n_idx) 为零, 则 u_n_val 默认为 0
+%         u_n_plus_N_val = 0; % 如果 p_m(n_idx) 为零, 则 u_n_plus_N_val 默认为 0
+% 
+%         % 检查 p_m(n_idx) 是否非零, 以避免除以零的错误
+%         % 使用一个小的 epsilon 进行浮点数比较
+%         if denominator_squared_term > 1e-12 % 判断分母项是否显著大于零的阈值
+%             denominator_val = sqrt(denominator_squared_term); % 计算分母
+%             % 根据公式 (26) 计算 u_n 和 u_{n+N_UE}
+%             u_n_val = t_n_val / denominator_val;
+%             u_n_plus_N_val = t_n_plus_N_val / denominator_val;
+%         end
+%         % 如果 denominator_squared_term 为零 (或数值上接近零),
+%         % 则 t_n_val 和 t_n_plus_N_val 也为零, 因此 u_n_val 和 u_n_plus_N_val 保持为 0.
+% 
+%         % 根据公式 (27): [v(m)]_n = [u]_n + j * [u]_{n+N_UE}
+%         % 构造 v(m) 的第 n_idx 个元素
+%         v_next(n_idx) = u_n_val + 1j * u_n_plus_N_val;
+%     end
+% 
+%     % 更新 v 为当前迭代计算得到的 v_next, 用于下一次迭代
+%     v = v_next;
+% end
+% % 输出: v 是经过 M 次迭代后的最终码字 v(M)
+% % 如果 p_m(n_idx) 非零, v 的每个元素的模长将是 1/sqrt(N);
+% % 如果 p_m(n_idx) 为零, 则 v 的对应元素为 0.
+% end
