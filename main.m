@@ -24,15 +24,14 @@ Q = 512;                % 角度量化数
 M0 = 1000;              % 最大迭代次数
 
 % OFDM参数
-Nc = 3276;              % 子载波数量 (共Nc个)
+Nc = 3276 / 12;              % 子载波数量 (共Nc个)
 M = Nc-1;               % 子载波索引
-fdelta = 120e3;         % 带宽 120 kHz (frequency interval)
+fdelta = 120e3 * 12;         % 带宽 120 kHz (frequency interval)
 Ts = 35.6e-06;          % OFDM符号周期 35.6μs, 包含Tcp
 Ns = 70;                % OFDM符号数 ->1?
-Ncp = 1;
 
 % 发射功率参数
-Ptx_dBm = 45;           % 发射功率 45 dBm
+Ptx_dBm = 44;           % 发射功率 44 dBm
 Ptx = 10^((Ptx_dBm - 30) / 10);  % 转换为瓦特
 
 % 基站几何配置 (等边三角形，边长500m)
@@ -51,76 +50,84 @@ NF_dB = 6;              % 噪声系数 6 dB
 T0 = 290;               % 标准温度 290K
 kB = 1.38e-23;          % 玻尔兹曼常数
 
+% Rainbow-Beamforming 相关参数 (用于计算随子载波变化的接收波束成形向量 wm)
+theta_start_deg = 60;       % rainbow-beam波束起始扫描角度 (度)
+theta_end_deg = -60;      % rainbow-beam波束终止扫描角度 (度)
+
+% 计算Rainbow-Beamforming所需的频率参数
+W_bandwidth = (Nc-1) * fdelta;              % 系统总带宽 (Hz)
+f0_lowest_freq = fc - W_bandwidth/2;        % 系统最低频率 (Hz)
+
 
 %% ================== 信号生成 ==================
 
 % 发射信号生成
-
-phi = pi/4 + randi([0 3], Nc, Ns) * pi/2;
-s = exp(1i * phi); % QPSK symbols: s(Nc, Ns)
+% phi = pi/4 + randi([0 3], Nc, Ns) * pi/2;
+% s = exp(1i * phi); % QPSK symbols: s(Nc, Ns)
+s_data = ones(Nc, Ns); % QPSK symbols: s(Nc, Ns)
 % --- (a) 对每个 OFDM 符号进行 IFFT ---
 % ifft(s, Nc, 1) 表示沿着第一个维度 (子载波维度) 进行 Nc 点 IFFT
-s_time_parallel = ifft(s, Nc, 1); 
+% s_time_parallel = ifft(s, Nc, 1); 
 % --- (b) 添加循环前缀 (CP) ---
 % 从每个符号末尾取 Ncp 个样本加到开头
 % --- (c) 并行转串行 (P/S) ---
+
 % 将所有符号按时间顺序连接成一个长的列向量: (Nc*Ns,1)
-s_time = s_time_parallel(:);
+s = s_data(:);
 
 % 调用 AMCF_ZCI 函数，根据指定参数计算波束成形权重。
 v = AMCF_ZCI(Nt, Omega0, B, Q, M0).';
+% x = s * v;
 
-x = s_time * v;
+% 所有子载波的接收波束成形向量 (wm)
+w = cell(Nc, 1);
 
-
-
-% 生成接收信号
-% [y_rx1, y_rx2] = generate_received_signals();
+for m_idx = 1:Nc
+    w{m_idx} = generate_rainbow_beam(Nr, fc, fdelta, Nc, d, theta_start_deg, theta_end_deg, m_idx);
+end
 
 %% ================== 信道建模 ==================
-
-% 子载波频率
-freq_sub = fc + (0:Nc) * fdelta / Nc;
-
-% 信道系数计算
-% alpha = sqrt(lambda^2 * rcs / ((4*pi)^3 * range_tx^4));
-
 % 生成信道矩阵
-H_channel = generate_ISAC_Hecho_channel(Nt, Nc, fc, lambda, d, Ts, target_pos, target_vel, rcs, fdelta);
+H_channel_rx1 = generate_ISAC_Hecho_channel(Nt, Nr, Nc, Ns, fc, lambda, d, d, Ts, target_pos, target_vel, rcs, fdelta, pos_rx1);
+H_channel_rx2 = generate_ISAC_Hecho_channel(Nt, Nr, Nc, Ns, fc, lambda, d, d, Ts, target_pos, target_vel, rcs, fdelta, pos_rx2);
 
-%% ================== YOLO==================
+% 生成接收信号
+Y_received_rx1 = generate_signal_Yreceived(Nc, Ns, Nt, Nr, fc, fdelta, d, s_data, v.', H_channel_rx1, theta_start_deg, theta_end_deg);
+Y_received_rx2 = generate_signal_Yreceived(Nc, Ns, Nt, Nr, fc, fdelta, d, s_data, v.', H_channel_rx2, theta_start_deg, theta_end_deg);
 
+
+%% ================== 感知算法 ==================
+
+% 将所有需要的参数打包到一个结构体中
+params.fc = fc;
+params.c0 = c0;
+params.lambda = lambda;
+params.Nt = Nt;
+params.Nr = Nr;
+params.d = d;
+params.Nc = Nc;
+params.Ns = Ns;
+params.fdelta = fdelta;
+params.Ts = Ts;
+params.v_tx = v.';
+params.theta_start_deg = theta_start_deg;
+params.theta_end_deg = theta_end_deg;
+
+% 设置要寻找的目标数量
+K = 1;
+
+% OMP估计
+[est_dist1, est_vel1, est_angle1] = estimate_target_parameters_omp(Y_received_rx1, params, K);
+[est_dist2, est_vel2, est_angle2] = estimate_target_parameters_omp(Y_received_rx2, params, K);
 
 %% ================== 性能评估 ==================
 
-% 计算RMSE
-% pos_error = norm(pos_est - target_pos);
-% vel_error = norm(vel_est - target_vel);
-
-%% ================== 函数定义 ==================
-
-function [y_rx1, y_rx2] = generate_received_signals(s_symbols, H_channel, w_rx, ...
-                                                   v_tx, M, Ns, noise_power)
-    % 生成接收信号
-    y_rx1 = zeros(Ns, M + 1);
-    y_rx2 = zeros(Ns, M + 1);
-    
-    for m = 0:M
-        for ns = 1:Ns
-            H_cells = H_channel{m + 1, ns};
-            H1 = H_cells{1};
-            H2 = H_cells{2};
-            
-            % 接收信号计算
-            signal1 = w_rx{m + 1}' * H1 * v_tx * s_symbols(m + 1);
-            signal2 = w_rx{m + 1}' * H2 * v_tx * s_symbols(m + 1);
-            
-            % 添加噪声
-            noise1 = sqrt(noise_power/2) * (randn + 1j*randn);
-            noise2 = sqrt(noise_power/2) * (randn + 1j*randn);
-            
-            y_rx1(ns, m + 1) = signal1 + noise1;
-            y_rx2(ns, m + 1) = signal2 + noise2;
-        end
-    end
-end
+% % 计算RMSE (均方根误差)
+% pos_error = abs(dist_est - norm(target_pos)); 
+% vel_error = abs(vel_est - norm(target_vel * (target_pos' / norm(target_pos)))); 
+% 
+% fprintf('\n--- 性能评估 ---\n');
+% fprintf('真实距离: %.2f m\n', norm(target_pos));
+% fprintf('估计距离误差: %.2f m\n', pos_error);
+% fprintf('真实径向速度: %.2f m/s\n', norm(target_vel * (target_pos' / norm(target_pos))));
+% fprintf('估计速度误差: %.2f m/s\n', vel_error);
