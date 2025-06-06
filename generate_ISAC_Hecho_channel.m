@@ -1,6 +1,5 @@
-function H_echo = generate_ISAC_Hecho_channel(Nt, Nr, Nc, Ns, fc, lambda, d_tx, d_rx, Ts, target_pos_xy, target_vel_xy, target_rcs, fdelta, rx_pos_xy, clutter_info)
-% 功能: 根据YOLO论文模型及双基站配置生成动态无人机目标的ISAC回波信道矩阵，并包含静态杂波。
-%       主要参考论文中的公式 (4) 和 (5) (动态目标部分)，并适配双基站模型。
+function H_echo = generate_ISAC_Hecho_channel(Nt, Nr, Nc, Ns, fc, lambda, d_tx, d_rx, Ts, target_pos_xy, target_vel_xy, target_rcs, fdelta, rx_pos_xy)
+% 功能: 根据YOLO论文模型及双基站配置生成动态无人机目标的ISAC回波信道矩阵，不包含静态杂波。
 %       发射机固定在原点 [0,0]。
 %
 % 输入参数:
@@ -18,9 +17,6 @@ function H_echo = generate_ISAC_Hecho_channel(Nt, Nr, Nc, Ns, fc, lambda, d_tx, 
 %   target_rcs    : 动态无人机的雷达散射截面 (m^2) (论文中 sigma_c,k)
 %   fdelta        : 子载波间隔 (Hz)
 %   rx_pos_xy     : 接收基站位置 [x, y] (m)
-%   clutter_info  : 静态杂波信息, cell数组，每个cell是一个struct，包含:
-%                   clutter_info{i}.pos_xy = [x,y] % 杂波位置
-%                   clutter_info{i}.rcs    = value % 杂波RCS
 %
 % 输出参数:
 %   H_echo        : Ns x Nc 的 cell 数组, 每个 cell 是 Nr x Nt 的回波信道矩阵 
@@ -108,57 +104,8 @@ for ns_idx = 1:Ns % OFDM 符号索引
         % A4. 计算动态目标信道矩阵 (Nr x Nt)
         H_dynamic_target_ns_m = alpha_k_dynamic * doppler_phase_dynamic * range_phase_dynamic * (a_km_rx * a_km_tx.');
         
-        % --- (B) 计算静态环境杂波的回波信道 Sum_i H_i,ns,m ---
-        H_static_clutter_ns_m = zeros(Nr, Nt); % 初始化当前符号和子载波的总杂波信道
-        
-        if ~isempty(clutter_info) && iscell(clutter_info)
-            for i_clutter = 1:length(clutter_info)
-                clutter_pos = clutter_info{i_clutter}.pos_xy;
-                clutter_rcs_val = clutter_info{i_clutter}.rcs;
-
-                % B1. Tx到杂波的几何参数
-                vec_tx_to_clutter = clutter_pos - pos_tx;
-                r_tx_c = norm(vec_tx_to_clutter);
-                if r_tx_c < 1e-6, r_tx_c = 1e-6; end
-                theta_tx_c = atan2(vec_tx_to_clutter(2), vec_tx_to_clutter(1));
-
-                % B2. Rx到杂波的几何参数
-                vec_rx_to_clutter = clutter_pos - rx_pos_xy;
-                r_rx_c = norm(vec_rx_to_clutter);
-                if r_rx_c < 1e-6, r_rx_c = 1e-6; end
-                vec_clutter_to_rx = rx_pos_xy - clutter_pos;
-                theta_rx_c = atan2(vec_clutter_to_rx(2), vec_clutter_to_rx(1));
-                
-                % B3. 杂波路径损耗系数 beta_i
-                beta_i_clutter = sqrt(lambda^2 * clutter_rcs_val / ((4*pi)^3)) / (r_tx_c * r_rx_c);
-                
-                % B4. 计算杂波的发射和接收导向矢量
-                a_cm_tx = zeros(Nt, 1); % Clutter transmit steering vector
-                for ant_idx = 1:Nt
-                    n_ant_tx = ant_idx - (Nt+1)/2;
-                    phase_val_tx_c = (2*pi*fm/c0) * n_ant_tx * d_tx * sin(theta_tx_c);
-                    a_cm_tx(ant_idx) = exp(1j * phase_val_tx_c);
-                end
-
-                a_cm_rx = zeros(Nr, 1); % Clutter receive steering vector
-                for ant_idx = 1:Nr
-                    n_ant_rx = ant_idx - (Nr+1)/2;
-                    phase_val_rx_c = (2*pi*fm/c0) * n_ant_rx * d_rx * sin(theta_rx_c);
-                    a_cm_rx(ant_idx) = exp(1j * phase_val_rx_c);
-                end
-                
-                % B5. 静态杂波的距离相位 (多普勒相位为1，因为是静态的)
-                range_phase_clutter = exp(-1j * 2*pi * fm * (r_tx_c + r_rx_c)/c0);
-                
-                % B6. 单个杂波单元的信道矩阵 (Nr x Nt)
-                H_clutter_i_ns_m = beta_i_clutter * range_phase_clutter * (a_cm_rx * a_cm_tx.');
-                
-                H_static_clutter_ns_m = H_static_clutter_ns_m + H_clutter_i_ns_m;
-            end
-        end
-        
         % --- (C) 总回波信道 ---
-        H_echo{ns_idx, m_idx} = H_dynamic_target_ns_m + H_static_clutter_ns_m;
+        H_echo{ns_idx, m_idx} = H_dynamic_target_ns_m;
     end
 end
 
