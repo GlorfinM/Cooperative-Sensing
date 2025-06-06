@@ -24,7 +24,7 @@ v = AMCF_ZCI(Nt, Omega0, B, Q, M);
 % Omega_plot = linspace(-1, 1, 1000);
 % beam_pattern = zeros(size(Omega_plot));
 % for i = 1:length(Omega_plot)
-%     a = exp(1j * pi * (0:N-1)' * Omega_plot(i)) / sqrt(N);
+%     a = exp(1j * pi * (0:Nt-1)' * Omega_plot(i)) / sqrt(Nt);
 %     beam_pattern(i) = abs(a' * v);
 % end
 % figure;

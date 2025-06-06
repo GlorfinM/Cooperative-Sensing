@@ -53,7 +53,7 @@ for m = 1:M
 
     % Closed-form solution for constant modulus vector v
     for n = 1:N
-        v(n) = p(n) / abs(p(n));
+        v(n) = p(n) / (sqrt(N) * abs(p(n)));
     end
 end
 
@@ -116,4 +116,4 @@ end
 % % 输出: v 是经过 M 次迭代后的最终码字 v(M)
 % % 如果 p_m(n_idx) 非零, v 的每个元素的模长将是 1/sqrt(N);
 % % 如果 p_m(n_idx) 为零, 则 v 的对应元素为 0.
-% end
+end
