@@ -11,40 +11,103 @@ pos_rx2 = [L*sqrt(3)/2, -L/2];  % 接收基站2位置 [x, y]
 
 % 目标参数
 target_pos = [250, 50];      % 目标位置 [x, y] (m)
+target_vel = [10, 5];
 
 % --- 绘图 ---
 % 创建一个新的图形窗口
 figure;
 hold on; % 允许在同一图形上叠加绘制多个对象
 
-% 绘制发射基站 (Tx) - 使用蓝色方块表示
-plot(pos_tx(1), pos_tx(2), 'bs', 'MarkerSize', 12, 'MarkerFaceColor', 'b', 'DisplayName', 'Transmitter (Tx)');
-text(pos_tx(1) + 10, pos_tx(2) + 10, 'Tx', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'b');
+% 绘制发射基站 (Tx) - 使用红色方块表示
+plot(pos_tx(1), pos_tx(2), 'rs', 'MarkerSize', 12, 'MarkerFaceColor', 'r', 'DisplayName', 'Tx');
+
 
 % 绘制接收基站 (Rx1 和 Rx2) - 使用红色上三角表示
-plot(pos_rx1(1), pos_rx1(2), 'r^', 'MarkerSize', 12, 'MarkerFaceColor', 'r', 'DisplayName', 'Receiver (Rx1)');
-text(pos_rx1(1) + 10, pos_rx1(2), 'Rx1', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'r');
-plot(pos_rx2(1), pos_rx2(2), 'r^', 'MarkerSize', 12, 'MarkerFaceColor', 'r', 'DisplayName', 'Receiver (Rx2)'); % 不重复显示图例
-text(pos_rx2(1) + 10, pos_rx2(2), 'Rx2', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'r');
+plot(pos_rx1(1), pos_rx1(2), 'r^', 'MarkerSize', 12, 'MarkerFaceColor', 'r', 'DisplayName', 'Rx1');
+plot(pos_rx2(1), pos_rx2(2), 'r^', 'MarkerSize', 12, 'MarkerFaceColor', 'r', 'DisplayName', 'Rx2'); 
+
 
 % 绘制无人机目标 - 使用绿色圆圈表示
 plot(target_pos(1), target_pos(2), 'go', 'MarkerSize', 10, 'MarkerFaceColor', 'g', 'DisplayName', 'UAV Target');
-text(target_pos(1) + 10, target_pos(2), 'Target', 'FontSize', 10, 'FontWeight', 'bold', 'Color', 'g');
+% 绘制目标速度矢量
+quiver(target_pos(1), target_pos(2), target_vel(1)*5, target_vel(2)*5, 'm', 'LineWidth', 1.5, 'MaxHeadSize', 0.5, 'AutoScale', 'off', 'DisplayName', 'Velocity Vector'); 
+text(target_pos(1) + target_vel(1)*5 + 5, target_pos(2) + target_vel(2)*5 + 5, sprintf('(%.2f, %.2f)', target_vel(1), target_vel(2)), 'FontSize', 9, 'Color', 'm');
 
-% 绘制基站之间的连线 (可选，用于显示三角形结构)
-plot([pos_tx(1), pos_rx1(1)], [pos_tx(2), pos_rx1(2)], 'k--'); % Tx to Rx1
-plot([pos_tx(1), pos_rx2(1)], [pos_tx(2), pos_rx2(2)], 'k--'); % Tx to Rx2
-plot([pos_rx1(1), pos_rx2(1)], [pos_rx1(2), pos_rx2(2)], 'k--'); % Rx1 to Rx2
+% 绘制基站之间的连线
+h_line1 = plot([pos_tx(1), pos_rx1(1)], [pos_tx(2), pos_rx1(2)], 'k--'); % Tx 到 Rx1
+set(get(get(h_line1,'Annotation'),'LegendInformation'),'IconDisplayStyle','off');
+
+h_line2 = plot([pos_tx(1), pos_rx2(1)], [pos_tx(2), pos_rx2(2)], 'k--'); % Tx 到 Rx2
+set(get(get(h_line2,'Annotation'),'LegendInformation'),'IconDisplayStyle','off');
+
+h_line3 = plot([pos_rx1(1), pos_rx2(1)], [pos_rx1(2), pos_rx2(2)], 'k--'); % Rx1 到 Rx2
+set(get(get(h_line3,'Annotation'),'LegendInformation'),'IconDisplayStyle','off');
+
+% --- 绘制信号路径 ---
+signal_path_color = 'b'; % 信号路径线条颜色
+signal_path_linestyle = '--'; % 信号路径线型
+signal_path_linewidth = 2;   % 信号路径线宽
+
+% 箭头参数
+arrow_color = 'b'; % 箭头颜色 (黑色)
+arrow_scale = 0.7; % 箭头整体缩放因子
+arrow_linewidth = 2; % 箭头线宽
+arrow_headsize_multiplier = 8; % 箭头头部大小乘数 (实际MaxHeadSize = multiplier * scale)
+arrow_body_length_factor = 0.25; % 箭头箭身长度因子 (相对于线段向量的部分长度)
+arrow_tail_offset_factor = 0.125; % 箭头尾部从线段中点向后的偏移因子
+
+% 1. Tx -> UAV 信号路径
+line_path_tx_uav = [pos_tx; target_pos];
+plot(line_path_tx_uav(:,1), line_path_tx_uav(:,2), ...
+     'Color', signal_path_color, 'LineStyle', signal_path_linestyle, 'LineWidth', signal_path_linewidth, ...
+     'HandleVisibility', 'off');
+
+mid_point_tx_uav = mean(line_path_tx_uav);
+vec_tx_uav = diff(line_path_tx_uav);
+quiver(mid_point_tx_uav(1) - vec_tx_uav(1)*arrow_tail_offset_factor*arrow_scale, ...
+       mid_point_tx_uav(2) - vec_tx_uav(2)*arrow_tail_offset_factor*arrow_scale, ...
+       vec_tx_uav(1)*arrow_body_length_factor*arrow_scale, ...
+       vec_tx_uav(2)*arrow_body_length_factor*arrow_scale, 0, ...
+       'Color', arrow_color, 'LineWidth', arrow_linewidth, ... 
+       'MaxHeadSize', arrow_headsize_multiplier*arrow_scale, 'HandleVisibility', 'off');
+
+% 2. UAV -> Rx1 信号路径
+line_path_uav_rx1 = [target_pos; pos_rx1];
+plot(line_path_uav_rx1(:,1), line_path_uav_rx1(:,2), ...
+     'Color', signal_path_color, 'LineStyle', signal_path_linestyle, 'LineWidth', signal_path_linewidth, ...
+     'HandleVisibility', 'off');
+
+mid_point_uav_rx1 = mean(line_path_uav_rx1);
+vec_uav_rx1 = diff(line_path_uav_rx1);
+quiver(mid_point_uav_rx1(1) - vec_uav_rx1(1)*arrow_tail_offset_factor*arrow_scale, ...
+       mid_point_uav_rx1(2) - vec_uav_rx1(2)*arrow_tail_offset_factor*arrow_scale, ...
+       vec_uav_rx1(1)*arrow_body_length_factor*arrow_scale, ...
+       vec_uav_rx1(2)*arrow_body_length_factor*arrow_scale, 0, ...
+       'Color', arrow_color, 'LineWidth', arrow_linewidth, ... 
+       'MaxHeadSize', arrow_headsize_multiplier*arrow_scale, 'HandleVisibility', 'off');
+
+% 3. UAV -> Rx2 信号路径
+line_path_uav_rx2 = [target_pos; pos_rx2];
+plot(line_path_uav_rx2(:,1), line_path_uav_rx2(:,2), ...
+     'Color', signal_path_color, 'LineStyle', signal_path_linestyle, 'LineWidth', signal_path_linewidth, ...
+     'DisplayName', 'Signal Path');
+
+mid_point_uav_rx2 = mean(line_path_uav_rx2);
+vec_uav_rx2 = diff(line_path_uav_rx2);
+quiver(mid_point_uav_rx2(1) - vec_uav_rx2(1)*arrow_tail_offset_factor*arrow_scale, ...
+       mid_point_uav_rx2(2) - vec_uav_rx2(2)*arrow_tail_offset_factor*arrow_scale, ...
+       vec_uav_rx2(1)*arrow_body_length_factor*arrow_scale, ...
+       vec_uav_rx2(2)*arrow_body_length_factor*arrow_scale, 0, ...
+       'Color', arrow_color, 'LineWidth', arrow_linewidth, ... 
+       'MaxHeadSize', arrow_headsize_multiplier*arrow_scale, 'HandleVisibility', 'off');
 
 % --- 图形设置 ---
-title('Base Station and UAV Target Position Diagram'); % 设置标题
-xlabel('X Coordinate (m)');                    % 设置 X 轴标签
-ylabel('Y Coordinate (m)');                    % 设置 Y 轴标签
-grid on;                               % 显示网格
+title('Base Station and UAV Target Position Diagram'); 
+xlabel('X Coordinate (m)');                    
+ylabel('Y Coordinate (m)');                    
+grid on;                               
 % 设置坐标轴范围
-% xlim([-100, 500]); % 设置 X 轴范围，例如从 -50 到 500
-
-axis equal;                            % 设置 X 和 Y 轴具有相同的比例，确保几何形状不失真
-ylim([-350, 350]); % 设置 Y 轴范围，使其更大，例如从 -350 到 350
-legend('show', 'Location', 'northwest');    % 显示图例
-hold off;                              % 结束叠加绘制
+axis equal;                            
+ylim([-350, 350]); %
+legend('show', 'Location', 'northwest');   
+hold off;                              
